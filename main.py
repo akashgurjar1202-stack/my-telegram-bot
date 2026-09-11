@@ -32,11 +32,11 @@ def keep_alive():
     t.start()
 
 # ---------------- CONFIGURATION ----------------
-BOT_TOKEN = "7513589199:AAGTDOe2mt9LnPD9wkFHq3q4YDfGujEB5_w"
-ADMIN_ID = 1164326786
+BOT_TOKEN = "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3grl_7YE"
+ADMIN_ID = 7213470918
 
-START_PHOTO = "https://t.me/aaaafghjvx/12"
-FIRST_CHANNEL_USERNAME = "Britania68"
+START_PHOTO = "https://t.me/aaaafghjvx/13"
+FIRST_CHANNEL_USERNAME = "RyanLoots"
 
 # States
 WAITING_FOR_PAYMENT_DETAILS = 1
