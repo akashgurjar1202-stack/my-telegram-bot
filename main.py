@@ -121,12 +121,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Channel 1", url=f"https://t.me/{FIRST_CHANNEL_USERNAME}"),
-            InlineKeyboardButton("📢 Channel 2", url="https://t.me/your_channel_2")
+            InlineKeyboardButton("📢 Channel 1", url=f"https://t.me/RyanLoots"),
+            InlineKeyboardButton("📢 Channel 2", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
-            InlineKeyboardButton("📢 Channel 3", url="https://t.me/your_channel_3"),
-            InlineKeyboardButton("📢 Channel 4", url="https://t.me/your_channel_4")
+            InlineKeyboardButton("📢 Channel 3", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("📢 Channel 4", url="https://t.me/+N0Dc5UOJwY41YTE1")
         ],
         [
             InlineKeyboardButton("✅ Joined All Channels", callback_data="check_joined")
