@@ -2,6 +2,8 @@ import logging
 import json
 import os
 import asyncio
+from threading import Thread
+from flask import Flask
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
@@ -12,6 +14,22 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
+# ---------------- DUMMY FLASK SERVER FOR RENDER ----------------
+app_web = Flask(__name__)
+
+@app_web.route('/')
+def home():
+    return "Bot is running 24/7!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    app_web.run(host="0.0.0.0", port=port)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.daemon = True
+    t.start()
 
 # ---------------- CONFIGURATION ----------------
 BOT_TOKEN = "7513589199:AAGTDOe2mt9LnPD9wkFHq3q4YDfGujEB5_w"
@@ -79,7 +97,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if referrer_id != str_id and referrer_id in users_db:
             users_db[str_id]["referred_by"] = referrer_id
             
-            # Credit â‚¹1 to referrer
+            # Credit ₹1 to referrer
             ref_bal = users_db[referrer_id].get("balance", 0.0)
             users_db[referrer_id]["balance"] = ref_bal + 1.0
             save_data(users_db)
@@ -87,38 +105,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_message(
                     chat_id=int(referrer_id),
-                    text=f"ðŸŽ‰ **Naya Refer!**\nUser ({user.full_name}) aapke link se juda. Aapko **â‚¹1.00** mil gaye hain!",
+                    text=f"🎉 **Naya Refer!**\nUser ({user.full_name}) aapke link se juda. Aapko **₹1.00** mil gaye hain!",
                     parse_mode="Markdown"
                 )
             except Exception:
                 pass
 
     welcome_text = (
-        "ðŸŽ‰ **WELCOME TO REFER & EARN BOT** ðŸŽ‰\n\n"
-        "ðŸ“¢ **Offer Details:**\n"
-        "ðŸŽ **Per Refer:** â‚¹1\n"
-        "ðŸ’³ **Minimum Withdrawal:** â‚¹1\n\n"
-        "âš ï¸ **Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!**"
+        "🎉 **WELCOME TO REFER & EARN BOT** 🎉\n\n"
+        "📢 **Offer Details:**\n"
+        "🎁 **Per Refer:** ₹1\n"
+        "💳 **Minimum Withdrawal:** ₹1\n\n"
+        "⚠️ **Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!**"
     )
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("ðŸ“¢ Channel 1", url=f"https://t.me/{FIRST_CHANNEL_USERNAME}"),
-            InlineKeyboardButton("ðŸ“¢ Channel 2", url="https://t.me/your_channel_2")
+            InlineKeyboardButton("📢 Channel 1", url=f"https://t.me/{FIRST_CHANNEL_USERNAME}"),
+            InlineKeyboardButton("📢 Channel 2", url="https://t.me/your_channel_2")
         ],
         [
-            InlineKeyboardButton("ðŸ“¢ Channel 3", url="https://t.me/your_channel_3"),
-            InlineKeyboardButton("ðŸ“¢ Channel 4", url="https://t.me/your_channel_4")
+            InlineKeyboardButton("📢 Channel 3", url="https://t.me/your_channel_3"),
+            InlineKeyboardButton("📢 Channel 4", url="https://t.me/your_channel_4")
         ],
         [
-            InlineKeyboardButton("âœ… Joined All Channels", callback_data="check_joined")
+            InlineKeyboardButton("✅ Joined All Channels", callback_data="check_joined")
         ],
         [
-            InlineKeyboardButton("ðŸ”— Generate/Get Invite Link", callback_data="get_invite")
+            InlineKeyboardButton("🔗 Generate/Get Invite Link", callback_data="get_invite")
         ],
         [
-            InlineKeyboardButton("ðŸ’° Check Balance", callback_data="check_balance"),
-            InlineKeyboardButton("ðŸ’¸ Withdrawal â‚¹1", callback_data="start_withdraw")
+            InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
+            InlineKeyboardButton("💸 Withdrawal ₹1", callback_data="start_withdraw")
         ]
     ])
 
@@ -156,50 +174,50 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "check_joined":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"âš ï¸ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
             return
-        await query.message.reply_text("âœ… Verification successful! Aap bot use kar sakte hain.")
+        await query.message.reply_text("✅ Verification successful! Aap bot use kar sakte hain.")
 
     elif query.data == "get_invite":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"âš ï¸ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
             return
 
         invite_link = f"https://t.me/{bot_info.username}?start={user_id}"
-        msg = f"ðŸ”— **Aapka Personal Invite Link:**\n`{invite_link}`\n\nIs link ko apne dosto ko bhejein aur har refer par â‚¹1 kamayein!"
-        share_text = f"ðŸŽ Is bot se har refer par â‚¹1 kamayein! Abhi join karein:\n{invite_link}"
+        msg = f"🔗 **Aapka Personal Invite Link:**\n`{invite_link}`\n\nIs link ko apne dosto ko bhejein aur har refer par ₹1 kamayein!"
+        share_text = f"🎁 Is bot se har refer par ₹1 kamayein! Abhi join karein:\n{invite_link}"
 
         sub_keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("ðŸ“² Share Link To Friends", switch_inline_query=share_text)
+                InlineKeyboardButton("📱 Share Link To Friends", switch_inline_query=share_text)
             ],
             [
-                InlineKeyboardButton("ðŸ’° Check Balance", callback_data="check_balance"),
-                InlineKeyboardButton("ðŸ’¸ Withdrawal â‚¹1", callback_data="start_withdraw"),
+                InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
+                InlineKeyboardButton("💸 Withdrawal ₹1", callback_data="start_withdraw"),
             ]
         ])
         await query.message.reply_text(msg, parse_mode="Markdown", reply_markup=sub_keyboard)
 
     elif query.data == "check_balance":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"âš ï¸ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
             return
 
         bal = users_db.get(str_id, {}).get("balance", 0.0)
-        await query.message.reply_text(f"ðŸ’° **Aapka Current Balance:** â‚¹{bal:.2f}", parse_mode="Markdown")
+        await query.message.reply_text(f"💰 **Aapka Current Balance:** ₹{bal:.2f}", parse_mode="Markdown")
 
     elif query.data == "start_withdraw":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"âš ï¸ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
             return
 
         bal = users_db.get(str_id, {}).get("balance", 0.0)
         if bal < 1.0:
-            await query.message.reply_text("âŒ Minimum withdrawal amount **â‚¹1** hai. Aapke paas kaafi balance nahi hai.", parse_mode="Markdown")
+            await query.message.reply_text("❌ Minimum withdrawal amount **₹1** hai. Aapke paas kaafi balance nahi hai.", parse_mode="Markdown")
             return ConversationHandler.END
 
         await query.message.reply_text(
-            "ðŸ“ Kripya apni payment detail bhejein (jaise Paytm Number, UPI ID, ya Bank Details):"
+            "📝 Kripya apni payment detail bhejein (jaise Paytm Number, UPI ID, ya Bank Details):"
         )
         return WAITING_FOR_PAYMENT_DETAILS
 
@@ -212,20 +230,20 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     bal = users_db.get(str_id, {}).get("balance", 0.0)
 
     if bal < 1.0:
-        await update.message.reply_text("âŒ Aapka balance kam hai.")
+        await update.message.reply_text("❌ Aapka balance kam hai.")
         return ConversationHandler.END
 
     users_db[str_id]["balance"] = bal - 1.0
     save_data(users_db)
 
-    await update.message.reply_text("âœ… Aapki withdrawal request submit ho gayi hai! Jaldi hi process kar di jayegi.")
+    await update.message.reply_text("✅ Aapki withdrawal request submit ho gayi hai! Jaldi hi process kar di jayegi.")
 
     admin_text = (
-        "ðŸš¨ **NEW WITHDRAWAL REQUEST** ðŸš¨\n\n"
-        f"ðŸ‘¤ **User:** {user.full_name} (@{user.username})\n"
-        f"ðŸ†” **User ID:** `{user.id}`\n"
-        f"ðŸ’° **Amount:** â‚¹1.00\n"
-        f"ðŸ’³ **Payment Details:** `{details}`"
+        "🚨 **NEW WITHDRAWAL REQUEST** 🚨\n\n"
+        f"👤 **User:** {user.full_name} (@{user.username})\n"
+        f"🆔 **User ID:** `{user.id}`\n"
+        f"💰 **Amount:** ₹1.00\n"
+        f"💳 **Payment Details:** `{details}`"
     )
 
     try:
@@ -240,15 +258,15 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 
-# ðŸ“¢ BROADCAST FEATURE (ADMIN ONLY)
+# BROADCAST FEATURE (ADMIN ONLY)
 async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("âŒ Aap admin nahi hain!")
+        await update.message.reply_text("❌ Aap admin nahi hain!")
         return ConversationHandler.END
 
     total_users = len(users_db)
     await update.message.reply_text(
-        f"ðŸ“¢ **Broadcast Mode Active**\nTotal Users: `{total_users}`\n\n"
+        f"📢 **Broadcast Mode Active**\nTotal Users: `{total_users}`\n\n"
         "Jo message saare members ko bhejna hai, wo yahan bhejein.\nCancel karne ke liye /cancel likhein."
     )
     return WAITING_FOR_BROADCAST_MSG
@@ -260,7 +278,7 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = 0
     failed = 0
 
-    status_msg = await update.message.reply_text(f"â³ Broadcast shuru ho raha hai... (0/{total_users})")
+    status_msg = await update.message.reply_text(f"⏳ Broadcast shuru ho raha hai... (0/{total_users})")
 
     for user_id_str in list(users_db.keys()):
         try:
@@ -271,10 +289,10 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
     await status_msg.edit_text(
-        f"âœ… **Broadcast Completed!**\n\n"
-        f"ðŸŽ¯ Success: `{success}`\n"
-        f"âŒ Failed: `{failed}`\n"
-        f"ðŸ‘¥ Total Users: `{total_users}`"
+        f"✅ **Broadcast Completed!**\n\n"
+        f"🎯 Success: `{success}`\n"
+        f"❌ Failed: `{failed}`\n"
+        f"👥 Total Users: `{total_users}`"
     )
     return ConversationHandler.END
 
@@ -284,7 +302,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     total_users = len(users_db)
-    await update.message.reply_text(f"ðŸ“Š **Bot Statistics:**\n\nTotal Joined Users: `{total_users}`", parse_mode="Markdown")
+    await update.message.reply_text(f"📊 **Bot Statistics:**\n\nTotal Joined Users: `{total_users}`", parse_mode="Markdown")
 
 
 # Cancel Handler
@@ -295,6 +313,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Main Runner
 def main():
+    # Web server start karein Render ke liye
+    keep_alive()
+
     app = Application.builder().token(BOT_TOKEN).build()
 
     withdraw_handler = ConversationHandler(
