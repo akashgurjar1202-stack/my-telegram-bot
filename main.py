@@ -33,6 +33,7 @@ def keep_alive():
 
 # ---------------- CONFIGURATION ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3grl_7YE")
+# Default Admin ID ko int format mein daala gaya hai
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
@@ -57,14 +58,15 @@ def load_data():
 
 
 def save_data(data):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
+    # Safe atomic save to prevent JSON corruption on sudden restarts
+    temp_file = f"{DB_FILE}.tmp"
+    with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
-
-
-users_db = load_data()
+    os.replace(temp_file, DB_FILE)
 
 
 def register_user(user_id, username=None):
+    users_db = load_data()
     str_id = str(user_id)
     if str_id not in users_db:
         users_db[str_id] = {
@@ -88,12 +90,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     str_id = str(user.id)
     
-    # Track Referral
+    users_db = load_data()
     is_new = str_id not in users_db
     register_user(user.id, user.username)
 
     if is_new and context.args:
-        referrer_id = context.args[0]
+        referrer_id = str(context.args[0])
+        users_db = load_data()
         if referrer_id != str_id and referrer_id in users_db:
             users_db[str_id]["referred_by"] = referrer_id
             
@@ -171,6 +174,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     str_id = str(user_id)
     bot_info = await context.bot.get_me()
+    users_db = load_data()
 
     if query.data == "check_joined":
         if not await is_user_joined(context, user_id):
@@ -213,6 +217,7 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     user_id = query.from_user.id
     str_id = str(user_id)
+    users_db = load_data()
 
     if not await is_user_joined(context, user_id):
         await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
@@ -234,6 +239,7 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     str_id = str(user.id)
     details = update.message.text
+    users_db = load_data()
     bal = users_db.get(str_id, {}).get("balance", 0.0)
 
     if bal < 10.0:
@@ -267,11 +273,16 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # BROADCAST FEATURE (ADMIN ONLY)
 async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    user_id = update.effective_user.id
+    
+    # Strict Integer Check for Admin ID
+    if int(user_id) != int(ADMIN_ID):
         await update.message.reply_text("❌ Aap admin nahi hain!")
         return ConversationHandler.END
 
+    users_db = load_data()
     total_users = len(users_db)
+    
     await update.message.reply_text(
         f"📢 <b>Broadcast Mode Active</b>\nTotal Users: <code>{total_users}</code>\n\n"
         "Jo message saare members ko bhejna hai, wo yahan bhejein.\nCancel karne ke liye /cancel likhein.",
@@ -282,25 +293,44 @@ async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    total_users = len(users_db)
+    
+    # Reload fresh users list from database
+    users_db = load_data()
+    user_ids = list(users_db.keys())
+    total_users = len(user_ids)
+
+    if total_users == 0:
+        await update.message.reply_text("❌ Broadcast ke liye koi users nahi mile!")
+        return ConversationHandler.END
+
     success = 0
     failed = 0
 
     status_msg = await update.message.reply_text(f"⏳ Broadcast shuru ho raha hai... (0/{total_users})")
 
-    for user_id_str in list(users_db.keys()):
+    for index, user_id_str in enumerate(user_ids, 1):
         try:
             await msg.copy(chat_id=int(user_id_str))
             success += 1
-            await asyncio.sleep(0.05)
-        except Exception:
+        except Exception as e:
+            logging.error(f"Failed sending broadcast to {user_id_str}: {e}")
             failed += 1
+
+        # Delay to prevent Telegram Flood Limits (API restriction)
+        await asyncio.sleep(0.05)
+
+        # Update status every 20 users
+        if index % 20 == 0 or index == total_users:
+            try:
+                await status_msg.edit_text(f"⏳ Broadcast chal raha hai... ({index}/{total_users})")
+            except Exception:
+                pass
 
     await status_msg.edit_text(
         f"✅ <b>Broadcast Completed!</b>\n\n"
         f"🎯 Success: <code>{success}</code>\n"
         f"❌ Failed: <code>{failed}</code>\n"
-        f"👥 Total Users: <code>{total_users}</code>",
+        f"👥 Total Targeted: <code>{total_users}</code>",
         parse_mode="HTML"
     )
     return ConversationHandler.END
@@ -308,8 +338,9 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # /stats Command
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
+    if int(update.effective_user.id) != int(ADMIN_ID):
         return
+    users_db = load_data()
     total_users = len(users_db)
     await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{total_users}</code>", parse_mode="HTML")
 
@@ -334,7 +365,7 @@ def main():
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        per_chat=True,
+        per_message=False,
     )
 
     broadcast_handler = ConversationHandler(
@@ -345,7 +376,7 @@ def main():
             ]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        per_chat=True,
+        per_message=False,
     )
 
     app.add_handler(CommandHandler("start", start))
@@ -365,4 +396,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
+    
