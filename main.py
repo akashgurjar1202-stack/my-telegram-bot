@@ -32,8 +32,8 @@ def keep_alive():
     t.start()
 
 # ---------------- CONFIGURATION ----------------
-BOT_TOKEN = "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3grl_7YE"
-ADMIN_ID = 7213470918
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3grl_7YE")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
 FIRST_CHANNEL_USERNAME = "RyanLoots"
@@ -97,31 +97,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if referrer_id != str_id and referrer_id in users_db:
             users_db[str_id]["referred_by"] = referrer_id
             
-            # Credit ₹1 to referrer
+            # Credit ₹2 to referrer
             ref_bal = users_db[referrer_id].get("balance", 0.0)
-            users_db[referrer_id]["balance"] = ref_bal + 1.0
+            users_db[referrer_id]["balance"] = ref_bal + 2.0
             save_data(users_db)
 
             try:
                 await context.bot.send_message(
                     chat_id=int(referrer_id),
-                    text=f"🎉 **Naya Refer!**\nUser ({user.full_name}) aapke link se juda. Aapko **₹1.00** mil gaye hain!",
-                    parse_mode="Markdown"
+                    text=f"🎉 <b>Naya Refer!</b>\nUser ({user.full_name}) aapke link se juda. Aapko <b>₹2.00</b> mil gaye hain!",
+                    parse_mode="HTML"
                 )
             except Exception:
                 pass
 
     welcome_text = (
-        "🎉 **WELCOME TO REFER & EARN BOT** 🎉\n\n"
-        "📢 **Offer Details:**\n"
-        "🎁 **Per Refer:** ₹1\n"
-        "💳 **Minimum Withdrawal:** ₹1\n\n"
-        "⚠️ **Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!**"
+        "🎉 <b>WELCOME TO REFER & EARN BOT</b> 🎉\n\n"
+        "📢 <b>Offer Details:</b>\n"
+        "🎁 <b>Per Refer:</b> ₹2\n"
+        "💳 <b>Minimum Withdrawal:</b> ₹10\n\n"
+        "⚠️ <b>Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!</b>"
     )
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Channel 1", url=f"https://t.me/RyanLoots"),
+            InlineKeyboardButton("📢 Channel 1", url="https://t.me/RyanLoots"),
             InlineKeyboardButton("📢 Channel 2", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
@@ -136,7 +136,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
-            InlineKeyboardButton("💸 Withdrawal ₹1", callback_data="start_withdraw")
+            InlineKeyboardButton("💸 Withdrawal ₹10", callback_data="start_withdraw")
         ]
     ])
 
@@ -145,7 +145,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_photo(
                 photo=START_PHOTO,
                 caption=welcome_text,
-                parse_mode="Markdown",
+                parse_mode="HTML",
                 reply_markup=keyboard
             )
         else:
@@ -153,18 +153,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_photo(
                     photo=photo_file,
                     caption=welcome_text,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                     reply_markup=keyboard
                 )
     except Exception:
         await update.message.reply_text(
             text=welcome_text,
-            parse_mode="Markdown",
+            parse_mode="HTML",
             reply_markup=keyboard
         )
 
 
-# Button Callbacks Handler
+# General Callback Buttons Handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -174,18 +174,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "check_joined":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
             return
         await query.message.reply_text("✅ Verification successful! Aap bot use kar sakte hain.")
 
     elif query.data == "get_invite":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
             return
 
         invite_link = f"https://t.me/{bot_info.username}?start={user_id}"
-        msg = f"🔗 **Aapka Personal Invite Link:**\n`{invite_link}`\n\nIs link ko apne dosto ko bhejein aur har refer par ₹1 kamayein!"
-        share_text = f"🎁 Is bot se har refer par ₹1 kamayein! Abhi join karein:\n{invite_link}"
+        msg = f"🔗 <b>Aapka Personal Invite Link:</b>\n<code>{invite_link}</code>\n\nIs link ko apne dosto ko bhejein aur har refer par ₹2 kamayein!"
+        share_text = f"🎁 Is bot se har refer par ₹2 kamayein! Abhi join karein:\n{invite_link}"
 
         sub_keyboard = InlineKeyboardMarkup([
             [
@@ -193,33 +193,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
             [
                 InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
-                InlineKeyboardButton("💸 Withdrawal ₹1", callback_data="start_withdraw"),
+                InlineKeyboardButton("💸 Withdrawal ₹10", callback_data="start_withdraw"),
             ]
         ])
-        await query.message.reply_text(msg, parse_mode="Markdown", reply_markup=sub_keyboard)
+        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=sub_keyboard)
 
     elif query.data == "check_balance":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
+            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
             return
 
         bal = users_db.get(str_id, {}).get("balance", 0.0)
-        await query.message.reply_text(f"💰 **Aapka Current Balance:** ₹{bal:.2f}", parse_mode="Markdown")
+        await query.message.reply_text(f"💰 <b>Aapka Current Balance:</b> ₹{bal:.2f}", parse_mode="HTML")
 
-    elif query.data == "start_withdraw":
-        if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle **Channel 1** (@{FIRST_CHANNEL_USERNAME}) join karein!")
-            return
 
-        bal = users_db.get(str_id, {}).get("balance", 0.0)
-        if bal < 1.0:
-            await query.message.reply_text("❌ Minimum withdrawal amount **₹1** hai. Aapke paas kaafi balance nahi hai.", parse_mode="Markdown")
-            return ConversationHandler.END
+# Entry point for Withdrawal Conversation
+async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    str_id = str(user_id)
 
-        await query.message.reply_text(
-            "📝 Kripya apni payment detail bhejein (jaise Paytm Number, UPI ID, ya Bank Details):"
-        )
-        return WAITING_FOR_PAYMENT_DETAILS
+    if not await is_user_joined(context, user_id):
+        await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
+        return ConversationHandler.END
+
+    bal = users_db.get(str_id, {}).get("balance", 0.0)
+    if bal < 10.0:
+        await query.message.reply_text("❌ Minimum withdrawal amount <b>₹10</b> hai. Aapke paas kaafi balance nahi hai.", parse_mode="HTML")
+        return ConversationHandler.END
+
+    await query.message.reply_text(
+        "📝 Kripya apni payment detail bhejein (jaise Paytm Number, UPI ID, ya Bank Details):"
+    )
+    return WAITING_FOR_PAYMENT_DETAILS
 
 
 # Processing Withdrawal Request
@@ -229,28 +236,28 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     details = update.message.text
     bal = users_db.get(str_id, {}).get("balance", 0.0)
 
-    if bal < 1.0:
+    if bal < 10.0:
         await update.message.reply_text("❌ Aapka balance kam hai.")
         return ConversationHandler.END
 
-    users_db[str_id]["balance"] = bal - 1.0
+    users_db[str_id]["balance"] = bal - 10.0
     save_data(users_db)
 
     await update.message.reply_text("✅ Aapki withdrawal request submit ho gayi hai! Jaldi hi process kar di jayegi.")
 
     admin_text = (
-        "🚨 **NEW WITHDRAWAL REQUEST** 🚨\n\n"
-        f"👤 **User:** {user.full_name} (@{user.username})\n"
-        f"🆔 **User ID:** `{user.id}`\n"
-        f"💰 **Amount:** ₹1.00\n"
-        f"💳 **Payment Details:** `{details}`"
+        "🚨 <b>NEW WITHDRAWAL REQUEST</b> 🚨\n\n"
+        f"👤 <b>User:</b> {user.full_name} (@{user.username})\n"
+        f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+        f"💰 <b>Amount:</b> ₹10.00\n"
+        f"💳 <b>Payment Details:</b> <code>{details}</code>"
     )
 
     try:
         await context.bot.send_message(
             chat_id=ADMIN_ID,
             text=admin_text,
-            parse_mode="Markdown",
+            parse_mode="HTML",
         )
     except Exception as e:
         logging.error(f"Failed to send alert to admin: {e}")
@@ -266,8 +273,9 @@ async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     total_users = len(users_db)
     await update.message.reply_text(
-        f"📢 **Broadcast Mode Active**\nTotal Users: `{total_users}`\n\n"
-        "Jo message saare members ko bhejna hai, wo yahan bhejein.\nCancel karne ke liye /cancel likhein."
+        f"📢 <b>Broadcast Mode Active</b>\nTotal Users: <code>{total_users}</code>\n\n"
+        "Jo message saare members ko bhejna hai, wo yahan bhejein.\nCancel karne ke liye /cancel likhein.",
+        parse_mode="HTML"
     )
     return WAITING_FOR_BROADCAST_MSG
 
@@ -289,10 +297,11 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             failed += 1
 
     await status_msg.edit_text(
-        f"✅ **Broadcast Completed!**\n\n"
-        f"🎯 Success: `{success}`\n"
-        f"❌ Failed: `{failed}`\n"
-        f"👥 Total Users: `{total_users}`"
+        f"✅ <b>Broadcast Completed!</b>\n\n"
+        f"🎯 Success: <code>{success}</code>\n"
+        f"❌ Failed: <code>{failed}</code>\n"
+        f"👥 Total Users: <code>{total_users}</code>",
+        parse_mode="HTML"
     )
     return ConversationHandler.END
 
@@ -302,7 +311,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     total_users = len(users_db)
-    await update.message.reply_text(f"📊 **Bot Statistics:**\n\nTotal Joined Users: `{total_users}`", parse_mode="Markdown")
+    await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{total_users}</code>", parse_mode="HTML")
 
 
 # Cancel Handler
@@ -313,13 +322,12 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Main Runner
 def main():
-    # Web server start karein Render ke liye
     keep_alive()
 
     app = Application.builder().token(BOT_TOKEN).build()
 
     withdraw_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(button_handler, pattern="^start_withdraw$")],
+        entry_points=[CallbackQueryHandler(start_withdraw, pattern="^start_withdraw$")],
         states={
             WAITING_FOR_PAYMENT_DETAILS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_withdrawal)
@@ -357,4 +365,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+        
