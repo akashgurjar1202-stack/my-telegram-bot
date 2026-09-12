@@ -31,9 +31,9 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# ---------------- CONFIGURATION ----------------
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3grl_7YE")
-# Default Admin ID ko int format mein daala gaya hai
+# ---------------- CONFIGURATION (SECURE) ----------------
+# Token code mein bilkul nahi hai, yeh Render ke Environment tab se aayega
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
@@ -58,7 +58,6 @@ def load_data():
 
 
 def save_data(data):
-    # Safe atomic save to prevent JSON corruption on sudden restarts
     temp_file = f"{DB_FILE}.tmp"
     with open(temp_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
@@ -100,7 +99,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if referrer_id != str_id and referrer_id in users_db:
             users_db[str_id]["referred_by"] = referrer_id
             
-            # Credit ₹2 to referrer
             ref_bal = users_db[referrer_id].get("balance", 0.0)
             users_db[referrer_id]["balance"] = ref_bal + 2.0
             save_data(users_db)
@@ -271,11 +269,10 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 
-# BROADCAST FEATURE (ADMIN ONLY)
+# BROADCAST FEATURE (WITH COMMAND FALLBACK)
 async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # Strict Integer Check for Admin ID
     if int(user_id) != int(ADMIN_ID):
         await update.message.reply_text("❌ Aap admin nahi hain!")
         return ConversationHandler.END
@@ -293,8 +290,6 @@ async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    
-    # Reload fresh users list from database
     users_db = load_data()
     user_ids = list(users_db.keys())
     total_users = len(user_ids)
@@ -316,10 +311,8 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Failed sending broadcast to {user_id_str}: {e}")
             failed += 1
 
-        # Delay to prevent Telegram Flood Limits (API restriction)
         await asyncio.sleep(0.05)
 
-        # Update status every 20 users
         if index % 20 == 0 or index == total_users:
             try:
                 await status_msg.edit_text(f"⏳ Broadcast chal raha hai... ({index}/{total_users})")
@@ -355,6 +348,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     keep_alive()
 
+    if not BOT_TOKEN:
+        raise ValueError("BOT_TOKEN Environment Variable is missing! Set it in Render Dashboard.")
+
     app = Application.builder().token(BOT_TOKEN).build()
 
     withdraw_handler = ConversationHandler(
@@ -375,7 +371,11 @@ def main():
                 MessageHandler(filters.ALL & ~filters.COMMAND, process_broadcast)
             ]
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("start", start)  # Emergency un-stick fallback
+        ],
+        allow_reentry=True,
         per_message=False,
     )
 
@@ -396,4 +396,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+                    
