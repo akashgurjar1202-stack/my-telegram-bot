@@ -36,7 +36,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "8737434171:AAEuADW_NUm2DEfGb68VVAc1Sik3
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
-FIRST_CHANNEL_USERNAME = "+SdK1d0-scTFhMzA1"
+FIRST_CHANNEL_USERNAME = "RyanLoots"
 
 # States
 WAITING_FOR_PAYMENT_DETAILS = 1
