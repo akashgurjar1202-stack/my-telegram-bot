@@ -121,7 +121,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Channel 1", url="https://t.me/RyanLoots"),
+            InlineKeyboardButton("📢 Channel 1", url="https://t.me/+SdK1d0-scTFhMzA1"),
             InlineKeyboardButton("📢 Channel 2", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
