@@ -99,7 +99,7 @@ def get_main_menu_keyboard():
 def get_channels_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Join ✨", url="https://t.me/RyanLoots"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
             InlineKeyboardButton("Join ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
