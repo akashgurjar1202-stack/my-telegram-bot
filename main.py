@@ -210,7 +210,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_user_joined(context, user_id):
             not_joined_msg = (
                 "❌ <b>Aapne abhi tak sabhi channels join nahi kiye hain!</b>\n\n"
-                "⚠️ Reward claim karne ke liye pehle uper diye gaye sabhi channels par **Join / Request to Join** karein, phir se **Claim Reward** par click karein."
+                "⚠️ Reward claim karne ke liye pehle uper diye gaye sabhi channels par Join / Request to Join karein, phir se Claim Reward par click karein."
             )
             # User ko chat mein message bhejna
             await query.message.reply_text(
