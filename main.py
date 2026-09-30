@@ -82,7 +82,7 @@ async def is_user_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         return True
 
 
-# Helper function: Feature Menu Buttons (Jo verification ke baad dikhenge)
+# Main Menu (Verification ke baad dikhne wale buttons)
 def get_main_menu_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -95,55 +95,9 @@ def get_main_menu_keyboard():
     ])
 
 
-# /start Command Handler
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    str_id = str(user.id)
-    
-    users_db = load_data()
-    is_new = str_id not in users_db
-    register_user(user.id, user.username)
-
-    if is_new and context.args:
-        referrer_id = str(context.args[0])
-        users_db = load_data()
-        if referrer_id != str_id and referrer_id in users_db:
-            users_db[str_id]["referred_by"] = referrer_id
-            ref_bal = users_db[referrer_id].get("balance", 0.0)
-            users_db[referrer_id]["balance"] = ref_bal + 2.0
-            save_data(users_db)
-
-            try:
-                await context.bot.send_message(
-                    chat_id=int(referrer_id),
-                    text=f"🎉 <b>Naya Refer!</b>\nUser ({user.full_name}) aapke link se juda. Aapko <b>₹2.00</b> mil gaye hain!",
-                    parse_mode="HTML"
-                )
-            except Exception:
-                pass
-
-    users_db = load_data()
-    is_verified = users_db.get(str_id, {}).get("is_verified", False)
-
-    # Agar user pehle se verified hai toh direct main menu dikhao
-    if is_verified:
-        await update.message.reply_text(
-            "🎉 <b>WELCOME BACK!</b>\n\nAapka account verified hai. Niche diye gaye options use karein:",
-            parse_mode="HTML",
-            reply_markup=get_main_menu_keyboard()
-        )
-        return
-
-    welcome_text = (
-        "🎉 <b>WELCOME TO REFER & EARN BOT</b> 🎉\n\n"
-        "📢 <b>Offer Details:</b>\n"
-        "🎁 <b>Per Refer:</b> ₹2\n"
-        "💳 <b>Minimum Withdrawal:</b> ₹10\n\n"
-        "⚠️ <b>Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!</b>"
-    )
-
-    # Sirf Join buttons aur Claim button dikhao
-    keyboard = InlineKeyboardMarkup([
+# Channels + Claim Keyboard
+def get_channels_keyboard():
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
             InlineKeyboardButton("Join ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
@@ -172,6 +126,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🔒 Claim", callback_data="check_joined")
         ]
     ])
+
+
+# /start Command Handler
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    str_id = str(user.id)
+    
+    users_db = load_data()
+    is_new = str_id not in users_db
+    register_user(user.id, user.username)
+
+    # Refer Credit System
+    if is_new and context.args:
+        referrer_id = str(context.args[0])
+        users_db = load_data()
+        if referrer_id != str_id and referrer_id in users_db:
+            users_db[str_id]["referred_by"] = referrer_id
+            ref_bal = users_db[referrer_id].get("balance", 0.0)
+            users_db[referrer_id]["balance"] = ref_bal + 2.0
+            save_data(users_db)
+
+            try:
+                await context.bot.send_message(
+                    chat_id=int(referrer_id),
+                    text=f"🎉 <b>Naya Refer!</b>\nUser ({user.full_name}) aapke link se juda. Aapko <b>₹2.00</b> mil gaye hain!",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+    welcome_text = (
+        "🎉 <b>WELCOME TO REFER & EARN BOT</b> 🎉\n\n"
+        "📢 <b>Offer Details:</b>\n"
+        "🎁 <b>Per Refer:</b> ₹2\n"
+        "💳 <b>Minimum Withdrawal:</b> ₹10\n\n"
+        "⚠️ <b>Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!</b>"
+    )
+
+    # User verified ho ya na ho, /start karne par hamesha Channels list hi aayegi
+    keyboard = get_channels_keyboard()
 
     try:
         if START_PHOTO.startswith("http://") or START_PHOTO.startswith("https://"):
@@ -219,9 +213,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_data(users_db)
         await query.answer("🔓 Verification Successful!", show_alert=True)
         
-        # Verification ke baad Invite Link, Balance aur Withdrawal buttons ka menu bhejein
+        # Verification hone ke baad hi baki options dikhenge
         await query.message.reply_text(
-            "✅ <b>Verification Successful!</b>\n\nAb aap Refer, Check Balance, aur Withdraw kar sakte hain:",
+            "✅ <b>Verification Successful!</b>\n\nAb aap niche diye gaye features use kar sakte hain:",
             parse_mode="HTML",
             reply_markup=get_main_menu_keyboard()
         )
