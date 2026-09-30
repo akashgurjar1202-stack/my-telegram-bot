@@ -1,7 +1,6 @@
 import logging
 import json
 import os
-import asyncio
 from threading import Thread
 from flask import Flask
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,7 +14,10 @@ from telegram.ext import (
     filters,
 )
 
-# ---------------- DUMMY FLASK SERVER FOR RENDER ----------------
+# Import separate broadcast module
+from broadcast import get_broadcast_handler
+
+# ---------------- FLASK KEEP-ALIVE SERVER ----------------
 app_web = Flask(__name__)
 
 @app_web.route('/')
@@ -31,19 +33,14 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# ---------------- CONFIGURATION (SECURE) ----------------
-# Token code mein bilkul nahi hai, yeh Render ke Environment tab se aayega
+# ---------------- CONFIGURATION ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
 FIRST_CHANNEL_USERNAME = "RyanLoots"
 
-# States
 WAITING_FOR_PAYMENT_DETAILS = 1
-WAITING_FOR_BROADCAST_MSG = 2
-
-# Database File Path
 DB_FILE = "users_data.json"
 
 
@@ -71,7 +68,8 @@ def register_user(user_id, username=None):
         users_db[str_id] = {
             "balance": 0.0,
             "username": username,
-            "referred_by": None
+            "referred_by": None,
+            "is_verified": False
         }
         save_data(users_db)
 
@@ -98,7 +96,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         users_db = load_data()
         if referrer_id != str_id and referrer_id in users_db:
             users_db[str_id]["referred_by"] = referrer_id
-            
             ref_bal = users_db[referrer_id].get("balance", 0.0)
             users_db[referrer_id]["balance"] = ref_bal + 2.0
             save_data(users_db)
@@ -134,7 +131,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
         ],
         [
-            InlineKeyboardButton("Claim ✅", callback_data="check_joined")
+            InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
+        ],
+        [
+            InlineKeyboardButton("Join ✨", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
+        ],
+        [
+            InlineKeyboardButton("Join ✨", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
+        ],
+        [
+            InlineKeyboardButton("🔒 Claim", callback_data="check_joined")
         ],
         [
             InlineKeyboardButton("🔗 Generate/Get Invite Link", callback_data="get_invite")
@@ -169,7 +178,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# General Callback Buttons Handler
+# Callback Query Handler
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -178,15 +187,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_info = await context.bot.get_me()
     users_db = load_data()
 
+    if str_id not in users_db:
+        register_user(user_id, query.from_user.username)
+        users_db = load_data()
+
     if query.data == "check_joined":
         if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
+            await query.answer("⚠️ Pehle saare Channels join karein tabhi claim unlock hoga!", show_alert=True)
             return
-        await query.message.reply_text("✅ Verification successful! Aap bot use kar sakte hain.")
+
+        users_db[str_id]["is_verified"] = True
+        save_data(users_db)
+        await query.answer("🔓 Verification Successful!", show_alert=True)
+        await query.message.reply_text("✅ Verification successful! Ab aap Refer aur Withdraw features use kar sakte hain.")
 
     elif query.data == "get_invite":
-        if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
+        if not users_db.get(str_id, {}).get("is_verified", False):
+            await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
             return
 
         invite_link = f"https://t.me/{bot_info.username}?start={user_id}"
@@ -194,9 +211,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         share_text = f"🎁 Is bot se har refer par ₹2 kamayein! Abhi join karein:\n{invite_link}"
 
         sub_keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("📱 Share Link To Friends", switch_inline_query=share_text)
-            ],
+            [InlineKeyboardButton("📱 Share Link To Friends", switch_inline_query=share_text)],
             [
                 InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
                 InlineKeyboardButton("💸 Withdrawal ₹10", callback_data="start_withdraw"),
@@ -205,15 +220,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=sub_keyboard)
 
     elif query.data == "check_balance":
-        if not await is_user_joined(context, user_id):
-            await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
+        if not users_db.get(str_id, {}).get("is_verified", False):
+            await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
             return
 
         bal = users_db.get(str_id, {}).get("balance", 0.0)
         await query.message.reply_text(f"💰 <b>Aapka Current Balance:</b> ₹{bal:.2f}", parse_mode="HTML")
 
 
-# Entry point for Withdrawal Conversation
+# Withdrawal Process
 async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -221,8 +236,8 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     str_id = str(user_id)
     users_db = load_data()
 
-    if not await is_user_joined(context, user_id):
-        await query.message.reply_text(f"⚠️ Pehle <b>Channel 1</b> (@{FIRST_CHANNEL_USERNAME}) join karein!", parse_mode="HTML")
+    if not users_db.get(str_id, {}).get("is_verified", False):
+        await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
         return ConversationHandler.END
 
     bal = users_db.get(str_id, {}).get("balance", 0.0)
@@ -230,13 +245,10 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("❌ Minimum withdrawal amount <b>₹10</b> hai. Aapke paas kaafi balance nahi hai.", parse_mode="HTML")
         return ConversationHandler.END
 
-    await query.message.reply_text(
-        "📝 Kripya apni payment detail bhejein (jaise Paytm Number, UPI ID, ya Bank Details):"
-    )
+    await query.message.reply_text("📝 Kripya apni payment detail bhejein (Paytm Number / UPI ID):")
     return WAITING_FOR_PAYMENT_DETAILS
 
 
-# Processing Withdrawal Request
 async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     str_id = str(user.id)
@@ -251,7 +263,7 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     users_db[str_id]["balance"] = bal - 10.0
     save_data(users_db)
 
-    await update.message.reply_text("✅ Aapki withdrawal request submit ho gayi hai! Jaldi hi process kar di jayegi.")
+    await update.message.reply_text("✅ Aapki withdrawal request submit ho gayi hai!")
 
     admin_text = (
         "🚨 <b>NEW WITHDRAWAL REQUEST</b> 🚨\n\n"
@@ -262,100 +274,34 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     try:
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=admin_text,
-            parse_mode="HTML",
-        )
+        await context.bot.send_message(chat_id=ADMIN_ID, text=admin_text, parse_mode="HTML")
     except Exception as e:
-        logging.error(f"Failed to send alert to admin: {e}")
+        logging.error(f"Failed sending alert: {e}")
 
     return ConversationHandler.END
 
 
-# BROADCAST FEATURE (WITH COMMAND FALLBACK)
-async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    
-    if int(user_id) != int(ADMIN_ID):
-        await update.message.reply_text("❌ Aap admin nahi hain!")
-        return ConversationHandler.END
-
-    users_db = load_data()
-    total_users = len(users_db)
-    
-    await update.message.reply_text(
-        f"📢 <b>Broadcast Mode Active</b>\nTotal Users: <code>{total_users}</code>\n\n"
-        "Jo message saare members ko bhejna hai, wo yahan bhejein.\nCancel karne ke liye /cancel likhein.",
-        parse_mode="HTML"
-    )
-    return WAITING_FOR_BROADCAST_MSG
-
-
-async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    users_db = load_data()
-    user_ids = list(users_db.keys())
-    total_users = len(user_ids)
-
-    if total_users == 0:
-        await update.message.reply_text("❌ Broadcast ke liye koi users nahi mile!")
-        return ConversationHandler.END
-
-    success = 0
-    failed = 0
-
-    status_msg = await update.message.reply_text(f"⏳ Broadcast shuru ho raha hai... (0/{total_users})")
-
-    for index, user_id_str in enumerate(user_ids, 1):
-        try:
-            await msg.copy(chat_id=int(user_id_str))
-            success += 1
-        except Exception as e:
-            logging.error(f"Failed sending broadcast to {user_id_str}: {e}")
-            failed += 1
-
-        await asyncio.sleep(0.05)
-
-        if index % 20 == 0 or index == total_users:
-            try:
-                await status_msg.edit_text(f"⏳ Broadcast chal raha hai... ({index}/{total_users})")
-            except Exception:
-                pass
-
-    await status_msg.edit_text(
-        f"✅ <b>Broadcast Completed!</b>\n\n"
-        f"🎯 Success: <code>{success}</code>\n"
-        f"❌ Failed: <code>{failed}</code>\n"
-        f"👥 Total Targeted: <code>{total_users}</code>",
-        parse_mode="HTML"
-    )
-    return ConversationHandler.END
-
-
-# /stats Command
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if int(update.effective_user.id) != int(ADMIN_ID):
         return
     users_db = load_data()
-    total_users = len(users_db)
-    await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{total_users}</code>", parse_mode="HTML")
+    await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{len(users_db)}</code>", parse_mode="HTML")
 
 
-# Cancel Handler
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operation cancel kar diya gaya hai.")
     return ConversationHandler.END
 
 
-# Main Runner
+# Main Application
 def main():
     keep_alive()
 
     if not BOT_TOKEN:
-        raise ValueError("BOT_TOKEN Environment Variable is missing! Set it in Render Dashboard.")
+        raise ValueError("BOT_TOKEN Environment Variable missing!")
 
     app = Application.builder().token(BOT_TOKEN).build()
+    app.bot_data["ADMIN_ID"] = ADMIN_ID
 
     withdraw_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_withdraw, pattern="^start_withdraw$")],
@@ -368,25 +314,13 @@ def main():
         per_message=False,
     )
 
-    broadcast_handler = ConversationHandler(
-        entry_points=[CommandHandler("broadcast", broadcast_start)],
-        states={
-            WAITING_FOR_BROADCAST_MSG: [
-                MessageHandler(filters.ALL & ~filters.COMMAND, process_broadcast)
-            ]
-        },
-        fallbacks=[
-            CommandHandler("cancel", cancel),
-            CommandHandler("start", start)  # Emergency un-stick fallback
-        ],
-        allow_reentry=True,
-        per_message=False,
-    )
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(withdraw_handler)
-    app.add_handler(broadcast_handler)
+    
+    # Broadcast handler register from broadcast.py
+    app.add_handler(get_broadcast_handler())
+    
     app.add_handler(CallbackQueryHandler(button_handler))
 
     logging.basicConfig(
@@ -394,10 +328,10 @@ def main():
         level=logging.INFO,
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.info("Bot is running...")
+    logging.info("Bot started successfully...")
     app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
     main()
-                    
+    
