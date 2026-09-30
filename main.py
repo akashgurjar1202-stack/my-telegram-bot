@@ -122,15 +122,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 Channel 1", url="https://t.me/+SdK1d0-scTFhMzA1"),
-            InlineKeyboardButton("📢 Channel 2", url="https://t.me/+y8wdkiMoBwpiNmZl")
+            InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
-            InlineKeyboardButton("📢 Channel 3", url="https://t.me/Gift_Codes_on"),
-            InlineKeyboardButton("📢 Channel 4", url="https://t.me/+N0Dc5UOJwY41YTE1")
+            InlineKeyboardButton("Join ✨", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
         ],
         [
-            InlineKeyboardButton("✅ Joined All Channels", callback_data="check_joined")
+            InlineKeyboardButton("Join ✨", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
+        ],
+        [
+            InlineKeyboardButton("Claim ✅", callback_data="check_joined")
         ],
         [
             InlineKeyboardButton("🔗 Generate/Get Invite Link", callback_data="get_invite")
