@@ -82,6 +82,19 @@ async def is_user_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         return True
 
 
+# Helper function: Feature Menu Buttons (Jo verification ke baad dikhenge)
+def get_main_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔗 Generate/Get Invite Link", callback_data="get_invite")
+        ],
+        [
+            InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
+            InlineKeyboardButton("💸 Withdrawal ₹10", callback_data="start_withdraw")
+        ]
+    ])
+
+
 # /start Command Handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -109,6 +122,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
+    users_db = load_data()
+    is_verified = users_db.get(str_id, {}).get("is_verified", False)
+
+    # Agar user pehle se verified hai toh direct main menu dikhao
+    if is_verified:
+        await update.message.reply_text(
+            "🎉 <b>WELCOME BACK!</b>\n\nAapka account verified hai. Niche diye gaye options use karein:",
+            parse_mode="HTML",
+            reply_markup=get_main_menu_keyboard()
+        )
+        return
+
     welcome_text = (
         "🎉 <b>WELCOME TO REFER & EARN BOT</b> 🎉\n\n"
         "📢 <b>Offer Details:</b>\n"
@@ -117,6 +142,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚠️ <b>Aage badhne ke liye sabse pehle niche diye gaye Channels ko join karein!</b>"
     )
 
+    # Sirf Join buttons aur Claim button dikhao
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
@@ -144,13 +170,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("🔒 Claim", callback_data="check_joined")
-        ],
-        [
-            InlineKeyboardButton("🔗 Generate/Get Invite Link", callback_data="get_invite")
-        ],
-        [
-            InlineKeyboardButton("💰 Check Balance", callback_data="check_balance"),
-            InlineKeyboardButton("💸 Withdrawal ₹10", callback_data="start_withdraw")
         ]
     ])
 
@@ -199,13 +218,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         users_db[str_id]["is_verified"] = True
         save_data(users_db)
         await query.answer("🔓 Verification Successful!", show_alert=True)
-        await query.message.reply_text("✅ Verification successful! Ab aap Refer aur Withdraw features use kar sakte hain.")
+        
+        # Verification ke baad Invite Link, Balance aur Withdrawal buttons ka menu bhejein
+        await query.message.reply_text(
+            "✅ <b>Verification Successful!</b>\n\nAb aap Refer, Check Balance, aur Withdraw kar sakte hain:",
+            parse_mode="HTML",
+            reply_markup=get_main_menu_keyboard()
+        )
 
     elif query.data == "get_invite":
-        if not users_db.get(str_id, {}).get("is_verified", False):
-            await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
-            return
-
         invite_link = f"https://t.me/{bot_info.username}?start={user_id}"
         msg = f"🔗 <b>Aapka Personal Invite Link:</b>\n<code>{invite_link}</code>\n\nIs link ko apne dosto ko bhejein aur har refer par ₹2 kamayein!"
         share_text = f"🎁 Is bot se har refer par ₹2 kamayein! Abhi join karein:\n{invite_link}"
@@ -220,10 +241,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=sub_keyboard)
 
     elif query.data == "check_balance":
-        if not users_db.get(str_id, {}).get("is_verified", False):
-            await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
-            return
-
         bal = users_db.get(str_id, {}).get("balance", 0.0)
         await query.message.reply_text(f"💰 <b>Aapka Current Balance:</b> ₹{bal:.2f}", parse_mode="HTML")
 
@@ -235,10 +252,6 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     str_id = str(user_id)
     users_db = load_data()
-
-    if not users_db.get(str_id, {}).get("is_verified", False):
-        await query.answer("🔒 Pehle '🔒 Claim' button par click karke verification poora karein!", show_alert=True)
-        return ConversationHandler.END
 
     bal = users_db.get(str_id, {}).get("balance", 0.0)
     if bal < 10.0:
@@ -334,4 +347,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
+        
