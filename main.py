@@ -124,15 +124,32 @@ def get_main_menu_keyboard():
     ])
 
 
+# ---------------- 12 CHANNEL BUTTONS KEYBOARD ----------------
 def get_channels_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("Join ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
-            InlineKeyboardButton("Join ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
+            InlineKeyboardButton("Channel 1 ✨", url="https://t.me/+SdK1d0-scTFhMzA1"),
+            InlineKeyboardButton("Channel 2 ✨", url="https://t.me/+y8wdkiMoBwpiNmZl")
         ],
         [
-            InlineKeyboardButton("Join ✨", url="https://t.me/Gift_Codes_on"),
-            InlineKeyboardButton("Join ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
+            InlineKeyboardButton("Channel 3 ✨", url="https://t.me/Gift_Codes_on"),
+            InlineKeyboardButton("Channel 4 ✨", url="https://t.me/+N0Dc5UOJwY41YTE1")
+        ],
+        [
+            InlineKeyboardButton("Channel 5 ✨", url="https://t.me/your_channel_5"),
+            InlineKeyboardButton("Channel 6 ✨", url="https://t.me/your_channel_6")
+        ],
+        [
+            InlineKeyboardButton("Channel 7 ✨", url="https://t.me/your_channel_7"),
+            InlineKeyboardButton("Channel 8 ✨", url="https://t.me/your_channel_8")
+        ],
+        [
+            InlineKeyboardButton("Channel 9 ✨", url="https://t.me/your_channel_9"),
+            InlineKeyboardButton("Channel 10 ✨", url="https://t.me/your_channel_10")
+        ],
+        [
+            InlineKeyboardButton("Channel 11 ✨", url="https://t.me/your_channel_11"),
+            InlineKeyboardButton("Channel 12 ✨", url="https://t.me/your_channel_12")
         ],
         [
             InlineKeyboardButton("🔒 Claim Reward", callback_data="check_joined")
