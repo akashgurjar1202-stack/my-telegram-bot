@@ -1,44 +1,18 @@
 import logging
 import asyncio
-import json
 import os
 from datetime import datetime
 from telegram import Update
 from telegram.ext import CommandHandler, MessageHandler, ConversationHandler, ContextTypes, filters
+from pymongo import MongoClient
 
 WAITING_FOR_BROADCAST_MSG = 2
-DB_FILE = "users_data.json"
-BROADCAST_LOG_FILE = "broadcast_history.json"
+MONGO_URI = os.environ.get("MONGO_URI")
 
-# Users Data Load
-def load_users():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return {}
-    return {}
-
-# Broadcast History Load
-def load_broadcast_logs():
-    if os.path.exists(BROADCAST_LOG_FILE):
-        with open(BROADCAST_LOG_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return []
-    return []
-
-# Broadcast History Save
-def save_broadcast_log(log_entry):
-    logs = load_broadcast_logs()
-    logs.append(log_entry)
-    
-    temp_file = f"{BROADCAST_LOG_FILE}.tmp"
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(logs, f, indent=4, ensure_ascii=False)
-    os.replace(temp_file, BROADCAST_LOG_FILE)
+client = MongoClient(MONGO_URI)
+db = client["telegram_bot_db"]
+users_col = db["users"]
+broadcast_logs_col = db["broadcast_logs"]
 
 
 # Broadcast Start Command
@@ -50,8 +24,7 @@ async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Aap admin nahi hain!")
         return ConversationHandler.END
 
-    users_db = load_users()
-    total_users = len(users_db)
+    total_users = users_col.count_documents({})
 
     await update.message.reply_text(
         f"📢 <b>Broadcast Mode Active</b>\nTotal Targeted Users: <code>{total_users}</code>\n\n"
@@ -64,9 +37,8 @@ async def broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Process and Save Broadcast
 async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    users_db = load_users()
-    user_ids = list(users_db.keys())
-    total_users = len(user_ids)
+    users = list(users_col.find({}, {"_id": 1}))
+    total_users = len(users)
 
     if total_users == 0:
         await update.message.reply_text("❌ Broadcast ke liye koi users nahi mile!")
@@ -79,7 +51,8 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    for index, user_id_str in enumerate(user_ids, 1):
+    for index, user in enumerate(users, 1):
+        user_id_str = user["_id"]
         try:
             await msg.copy(chat_id=int(user_id_str))
             success += 1
@@ -97,9 +70,10 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Broadcast Data Save Function Call
+    # Broadcast Data Save in MongoDB
+    total_broadcasts = broadcast_logs_col.count_documents({})
     broadcast_data = {
-        "broadcast_id": len(load_broadcast_logs()) + 1,
+        "broadcast_id": total_broadcasts + 1,
         "date_start": start_time,
         "date_end": end_time,
         "total_users": total_users,
@@ -107,14 +81,14 @@ async def process_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "failed_count": failed,
         "message_text": msg.text or msg.caption or "[Media Content]"
     }
-    save_broadcast_log(broadcast_data)
+    broadcast_logs_col.insert_one(broadcast_data)
 
     await status_msg.edit_text(
         f"✅ <b>Broadcast Completed & Saved!</b>\n\n"
         f"🎯 Success: <code>{success}</code>\n"
         f"❌ Failed: <code>{failed}</code>\n"
         f"👥 Total Targeted: <code>{total_users}</code>\n"
-        f"💾 <i>Data successfully saved in broadcast history!</i>",
+        f"💾 <i>Data successfully saved in MongoDB broadcast history!</i>",
         parse_mode="HTML"
     )
     return ConversationHandler.END
@@ -139,4 +113,3 @@ def get_broadcast_handler():
         allow_reentry=True,
         per_message=False,
     )
-  
