@@ -15,6 +15,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from pymongo import MongoClient
 
 from broadcast import get_broadcast_handler
 
@@ -37,44 +38,31 @@ def keep_alive():
 # ---------------- CONFIGURATION ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 7213470918))
+MONGO_URI = os.environ.get("MONGO_URI")  # MongoDB Connection String from Environment Variable
+
+# Database Connection Setup
+client = MongoClient(MONGO_URI)
+db = client["telegram_bot_db"]
+users_col = db["users"]
 
 START_PHOTO = "https://t.me/aaaafghjvx/13"
 FIRST_CHANNEL_USERNAME = "RyanLoots"
 
 WAITING_FOR_PAYMENT_DETAILS = 1
-DB_FILE = "users_data.json"
-db_lock = asyncio.Lock()
-
-
-def load_data():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                return {}
-    return {}
-
-
-def save_data(data):
-    temp_file = f"{DB_FILE}.tmp"
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-    os.replace(temp_file, DB_FILE)
 
 
 def register_user(user_id, username=None):
-    users_db = load_data()
     str_id = str(user_id)
-    if str_id not in users_db:
-        users_db[str_id] = {
+    user = users_col.find_one({"_id": str_id})
+    if not user:
+        users_col.insert_one({
+            "_id": str_id,
             "balance": 0.0,
             "username": username,
             "referred_by": None,
             "is_verified": False,
             "has_requested_join": False
-        }
-        save_data(users_db)
+        })
 
 
 async def is_user_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
@@ -89,9 +77,8 @@ async def is_user_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bo
         is_public_ok = True
 
     # 2. Private Channel Request Check
-    async with db_lock:
-        users_db = load_data()
-        is_request_ok = users_db.get(str_id, {}).get("has_requested_join", False)
+    user = users_col.find_one({"_id": str_id})
+    is_request_ok = user.get("has_requested_join", False) if user else False
 
     return is_public_ok and is_request_ok
 
@@ -102,14 +89,8 @@ async def track_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = request.from_user.id
     str_id = str(user_id)
 
-    async with db_lock:
-        users_db = load_data()
-        if str_id not in users_db:
-            register_user(user_id, request.from_user.username)
-            users_db = load_data()
-        
-        users_db[str_id]["has_requested_join"] = True
-        save_data(users_db)
+    register_user(user_id, request.from_user.username)
+    users_col.update_one({"_id": str_id}, {"$set": {"has_requested_join": True}})
 
 
 def get_main_menu_keyboard():
@@ -124,7 +105,6 @@ def get_main_menu_keyboard():
     ])
 
 
-# ---------------- 12 CHANNEL BUTTONS KEYBOARD ----------------
 def get_channels_keyboard():
     return InlineKeyboardMarkup([
         [
@@ -161,35 +141,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     str_id = str(user.id)
     
-    async with db_lock:
-        users_db = load_data()
-        is_new = str_id not in users_db
-        register_user(user.id, user.username)
+    existing_user = users_col.find_one({"_id": str_id})
+    is_new = existing_user is None
+    register_user(user.id, user.username)
 
-        if is_new and context.args:
-            referrer_id = str(context.args[0])
-            users_db = load_data()
-            if referrer_id != str_id and referrer_id in users_db:
-                users_db[str_id]["referred_by"] = referrer_id
-                ref_bal = users_db[referrer_id].get("balance", 0.0)
-                users_db[referrer_id]["balance"] = ref_bal + 2.0
-                save_data(users_db)
+    if is_new and context.args:
+        referrer_id = str(context.args[0])
+        referrer = users_col.find_one({"_id": referrer_id})
+        if referrer_id != str_id and referrer:
+            users_col.update_one({"_id": str_id}, {"$set": {"referred_by": referrer_id}})
+            ref_bal = referrer.get("balance", 0.0)
+            users_col.update_one({"_id": referrer_id}, {"$set": {"balance": ref_bal + 2.0}})
 
-                try:
-                    await context.bot.send_message(
-                        chat_id=int(referrer_id),
-                        text=f"🎉 <b>Naya Refer!</b>\nUser ({user.full_name}) aapke link se juda. Aapko <b>₹2.00</b> mil gaye hain!",
-                        parse_mode="HTML"
-                    )
-                except Exception:
-                    pass
+            try:
+                await context.bot.send_message(
+                    chat_id=int(referrer_id),
+                    text=f"🎉 <b>Naya Refer!</b>\nUser ({user.full_name}) aapke link se juda. Aapko <b>₹2.00</b> mil gaye hain!",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
 
     welcome_text = (
         "🎉 <b>WELCOME TO REFER & EARN BOT</b> 🎉\n\n"
         "📢 <b>Offer Details:</b>\n"
         "🎁 <b>Per Refer:</b> ₹2\n"
         "💳 <b>Minimum Withdrawal:</b> ₹10\n\n"
-        "⚠️ <b>Aage badhne ke liye sabse pehle niche diye gaye Channels ko join/request karein!</b>"
+        "⚠️ <b>Aage badhne ke liye sabse pehle niche दिए गए Channels ko join/request karein!</b>"
     )
 
     keyboard = get_channels_keyboard()
@@ -216,20 +194,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     str_id = str(user_id)
     bot_info = await context.bot.get_me()
 
-    async with db_lock:
-        users_db = load_data()
-        if str_id not in users_db:
-            register_user(user_id, query.from_user.username)
-            users_db = load_data()
+    register_user(user_id, query.from_user.username)
 
     if query.data == "check_joined":
-        # Check karna ki user ne join/request kiya hai ya nahi
         if not await is_user_joined(context, user_id):
             not_joined_msg = (
                 "❌ <b>Aapne abhi tak sabhi channels join nahi kiye hain!</b>\n\n"
                 "⚠️ Reward claim karne ke liye pehle uper diye gaye sabhi channels par Join / Request to Join karein, phir se Claim Reward par click karein."
             )
-            # User ko chat mein message bhejna
             await query.message.reply_text(
                 text=not_joined_msg,
                 parse_mode="HTML",
@@ -237,10 +209,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        async with db_lock:
-            users_db = load_data()
-            users_db[str_id]["is_verified"] = True
-            save_data(users_db)
+        users_col.update_one({"_id": str_id}, {"$set": {"is_verified": True}})
 
         await query.answer("🔓 Verification Successful!", show_alert=True)
         
@@ -265,9 +234,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=sub_keyboard)
 
     elif query.data == "check_balance":
-        async with db_lock:
-            users_db = load_data()
-            bal = users_db.get(str_id, {}).get("balance", 0.0)
+        user = users_col.find_one({"_id": str_id})
+        bal = user.get("balance", 0.0) if user else 0.0
         await query.message.reply_text(f"💰 <b>Aapka Current Balance:</b> ₹{bal:.2f}", parse_mode="HTML")
 
 
@@ -277,9 +245,8 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     str_id = str(user_id)
 
-    async with db_lock:
-        users_db = load_data()
-        bal = users_db.get(str_id, {}).get("balance", 0.0)
+    user = users_col.find_one({"_id": str_id})
+    bal = user.get("balance", 0.0) if user else 0.0
 
     if bal < 10.0:
         await query.message.reply_text("❌ Minimum withdrawal amount <b>₹10</b> hai. Aapke paas kaafi balance nahi hai.", parse_mode="HTML")
@@ -294,16 +261,14 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
     str_id = str(user.id)
     details = update.message.text
 
-    async with db_lock:
-        users_db = load_data()
-        bal = users_db.get(str_id, {}).get("balance", 0.0)
+    u_doc = users_col.find_one({"_id": str_id})
+    bal = u_doc.get("balance", 0.0) if u_doc else 0.0
 
-        if bal < 10.0:
-            await update.message.reply_text("❌ Aapka balance kam hai.")
-            return ConversationHandler.END
+    if bal < 10.0:
+        await update.message.reply_text("❌ Aapka balance kam hai.")
+        return ConversationHandler.END
 
-        users_db[str_id]["balance"] = bal - 10.0
-        save_data(users_db)
+    users_col.update_one({"_id": str_id}, {"$set": {"balance": bal - 10.0}})
 
     await update.message.reply_text("✅ Aapki withdrawal request submit ho gayi hai!")
 
@@ -326,9 +291,8 @@ async def process_withdrawal(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if int(update.effective_user.id) != int(ADMIN_ID):
         return
-    async with db_lock:
-        users_db = load_data()
-    await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{len(users_db)}</code>", parse_mode="HTML")
+    total_users = users_col.count_documents({})
+    await update.message.reply_text(f"📊 <b>Bot Statistics:</b>\n\nTotal Joined Users: <code>{total_users}</code>", parse_mode="HTML")
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -341,6 +305,8 @@ def main():
 
     if not BOT_TOKEN:
         raise ValueError("BOT_TOKEN Environment Variable missing!")
+    if not MONGO_URI:
+        raise ValueError("MONGO_URI Environment Variable missing!")
 
     app = Application.builder().token(BOT_TOKEN).build()
     app.bot_data["ADMIN_ID"] = ADMIN_ID
